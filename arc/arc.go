@@ -5,8 +5,8 @@ package arc
 
 import (
 	"sync"
-
-	"github.com/hashicorp/golang-lru/v2/simplelru"
+	
+	"github.com/gozelle/lru/simplelru"
 )
 
 // ARCCache is a thread-safe fixed size Adaptive Replacement Cache (ARC).
@@ -20,13 +20,13 @@ import (
 type ARCCache[K comparable, V any] struct {
 	size int // Size is the total capacity of the cache
 	p    int // P is the dynamic preference towards T1 or T2
-
+	
 	t1 simplelru.LRUCache[K, V]        // T1 is the LRU for recently accessed items
 	b1 simplelru.LRUCache[K, struct{}] // B1 is the LRU for evictions from t1
-
+	
 	t2 simplelru.LRUCache[K, V]        // T2 is the LRU for frequently accessed items
 	b2 simplelru.LRUCache[K, struct{}] // B2 is the LRU for evictions from t2
-
+	
 	lock sync.RWMutex
 }
 
@@ -49,7 +49,7 @@ func NewARC[K comparable, V any](size int) (*ARCCache[K, V], error) {
 	if err != nil {
 		return nil, err
 	}
-
+	
 	// Initialize the ARC
 	c := &ARCCache[K, V]{
 		size: size,
@@ -66,7 +66,7 @@ func NewARC[K comparable, V any](size int) (*ARCCache[K, V], error) {
 func (c *ARCCache[K, V]) Get(key K) (value V, ok bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-
+	
 	// If the value is contained in T1 (recent), then
 	// promote it to T2 (frequent)
 	if val, ok := c.t1.Peek(key); ok {
@@ -74,12 +74,12 @@ func (c *ARCCache[K, V]) Get(key K) (value V, ok bool) {
 		c.t2.Add(key, val)
 		return val, ok
 	}
-
+	
 	// Check if the value is contained in T2 (frequent)
 	if val, ok := c.t2.Get(key); ok {
 		return val, ok
 	}
-
+	
 	// No hit
 	return
 }
@@ -88,7 +88,7 @@ func (c *ARCCache[K, V]) Get(key K) (value V, ok bool) {
 func (c *ARCCache[K, V]) Add(key K, value V) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-
+	
 	// Check if the value is contained in T1 (recent), and potentially
 	// promote it to frequent T2
 	if c.t1.Contains(key) {
@@ -96,13 +96,13 @@ func (c *ARCCache[K, V]) Add(key K, value V) {
 		c.t2.Add(key, value)
 		return
 	}
-
+	
 	// Check if the value is already in T2 (frequent) and update it
 	if c.t2.Contains(key) {
 		c.t2.Add(key, value)
 		return
 	}
-
+	
 	// Check if this value was recently evicted as part of the
 	// recently used list
 	if c.b1.Contains(key) {
@@ -118,20 +118,20 @@ func (c *ARCCache[K, V]) Add(key K, value V) {
 		} else {
 			c.p += delta
 		}
-
+		
 		// Potentially need to make room in the cache
 		if c.t1.Len()+c.t2.Len() >= c.size {
 			c.replace(false)
 		}
-
+		
 		// Remove from B1
 		c.b1.Remove(key)
-
+		
 		// Add the key to the frequently used list
 		c.t2.Add(key, value)
 		return
 	}
-
+	
 	// Check if this value was recently evicted as part of the
 	// frequently used list
 	if c.b2.Contains(key) {
@@ -147,25 +147,25 @@ func (c *ARCCache[K, V]) Add(key K, value V) {
 		} else {
 			c.p -= delta
 		}
-
+		
 		// Potentially need to make room in the cache
 		if c.t1.Len()+c.t2.Len() >= c.size {
 			c.replace(true)
 		}
-
+		
 		// Remove from B2
 		c.b2.Remove(key)
-
+		
 		// Add the key to the frequently used list
 		c.t2.Add(key, value)
 		return
 	}
-
+	
 	// Potentially need to make room in the cache
 	if c.t1.Len()+c.t2.Len() >= c.size {
 		c.replace(false)
 	}
-
+	
 	// Keep the size of the ghost buffers trim
 	if c.b1.Len() > c.size-c.p {
 		c.b1.RemoveOldest()
@@ -173,7 +173,7 @@ func (c *ARCCache[K, V]) Add(key K, value V) {
 	if c.b2.Len() > c.p {
 		c.b2.RemoveOldest()
 	}
-
+	
 	// Add to the recently seen list
 	c.t1.Add(key, value)
 }

@@ -6,15 +6,15 @@ package lru
 import (
 	"errors"
 	"sync"
-
-	"github.com/hashicorp/golang-lru/v2/simplelru"
+	
+	"github.com/gozelle/lru/simplelru"
 )
 
 const (
 	// Default2QRecentRatio is the ratio of the 2Q cache dedicated
 	// to recently added entries that have only been accessed once.
 	Default2QRecentRatio = 0.25
-
+	
 	// Default2QGhostEntries is the default ratio of ghost
 	// entries kept to track entries recently evicted
 	Default2QGhostEntries = 0.50
@@ -32,7 +32,7 @@ const (
 type TwoQueueCache[K comparable, V any] struct {
 	size       int
 	recentSize int
-
+	
 	recent      simplelru.LRUCache[K, V]
 	frequent    simplelru.LRUCache[K, V]
 	recentEvict simplelru.LRUCache[K, struct{}]
@@ -57,11 +57,11 @@ func New2QParams[K comparable, V any](size int, recentRatio, ghostRatio float64)
 	if ghostRatio < 0.0 || ghostRatio > 1.0 {
 		return nil, errors.New("invalid ghost ratio")
 	}
-
+	
 	// Determine the sub-sizes
 	recentSize := int(float64(size) * recentRatio)
 	evictSize := int(float64(size) * ghostRatio)
-
+	
 	// Allocate the LRUs
 	recent, err := simplelru.NewLRU[K, V](size, nil)
 	if err != nil {
@@ -75,7 +75,7 @@ func New2QParams[K comparable, V any](size int, recentRatio, ghostRatio float64)
 	if err != nil {
 		return nil, err
 	}
-
+	
 	// Initialize the cache
 	c := &TwoQueueCache[K, V]{
 		size:        size,
@@ -91,12 +91,12 @@ func New2QParams[K comparable, V any](size int, recentRatio, ghostRatio float64)
 func (c *TwoQueueCache[K, V]) Get(key K) (value V, ok bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-
+	
 	// Check if this is a frequent value
 	if val, ok := c.frequent.Get(key); ok {
 		return val, ok
 	}
-
+	
 	// If the value is contained in recent, then we
 	// promote it to frequent
 	if val, ok := c.recent.Peek(key); ok {
@@ -104,7 +104,7 @@ func (c *TwoQueueCache[K, V]) Get(key K) (value V, ok bool) {
 		c.frequent.Add(key, val)
 		return val, ok
 	}
-
+	
 	// No hit
 	return
 }
@@ -113,14 +113,14 @@ func (c *TwoQueueCache[K, V]) Get(key K) (value V, ok bool) {
 func (c *TwoQueueCache[K, V]) Add(key K, value V) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-
+	
 	// Check if the value is frequently used already,
 	// and just update the value
 	if c.frequent.Contains(key) {
 		c.frequent.Add(key, value)
 		return
 	}
-
+	
 	// Check if the value is recently used, and promote
 	// the value into the frequent list
 	if c.recent.Contains(key) {
@@ -128,7 +128,7 @@ func (c *TwoQueueCache[K, V]) Add(key K, value V) {
 		c.frequent.Add(key, value)
 		return
 	}
-
+	
 	// If the value was recently evicted, add it to the
 	// frequently used list
 	if c.recentEvict.Contains(key) {
@@ -137,7 +137,7 @@ func (c *TwoQueueCache[K, V]) Add(key K, value V) {
 		c.frequent.Add(key, value)
 		return
 	}
-
+	
 	// Add to the recently seen list
 	c.ensureSpace(false)
 	c.recent.Add(key, value)
@@ -151,7 +151,7 @@ func (c *TwoQueueCache[K, V]) ensureSpace(recentEvict bool) {
 	if recentLen+freqLen < c.size {
 		return
 	}
-
+	
 	// If the recent buffer is larger than
 	// the target, evict from there
 	if recentLen > 0 && (recentLen > c.recentSize || (recentLen == c.recentSize && !recentEvict)) {
@@ -159,7 +159,7 @@ func (c *TwoQueueCache[K, V]) ensureSpace(recentEvict bool) {
 		c.recentEvict.Add(k, struct{}{})
 		return
 	}
-
+	
 	// Remove from the frequent list otherwise
 	c.frequent.RemoveOldest()
 }

@@ -7,7 +7,7 @@ thread safe LRU cache. It is based on the cache in Groupcache.
 Documentation
 =============
 
-Full docs are available on [Go Packages](https://pkg.go.dev/github.com/hashicorp/golang-lru/v2)
+Full docs are available on [Go Packages](https://pkg.go.dev/github.com/gozelle/lru)
 
 Example
 =======
@@ -19,7 +19,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/hashicorp/golang-lru/v2"
+	"github.com/gozelle/lru"
 )
 
 func main() {

@@ -1,3 +1,3 @@
-module github.com/hashicorp/golang-lru/v2
+module github.com/gozelle/lru
 
 go 1.18
